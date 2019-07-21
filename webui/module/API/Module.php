@@ -1,8 +1,8 @@
 <?php
 
-namespace Api;
+namespace API;
 
-use Api\Model\ApiModel;
+use API\Model\APIModel;
 
 class Module
 {
@@ -30,8 +30,8 @@ class Module
     {
         return array(
             'factories' => array(
-                'Api\Model\ApiModel' => function () {
-                    $model = new ApiModel();
+                'API\Model\APIModel' => function () {
+                    $model = new APIModel();
                     return $model;
                 }
             )
@@ -39,3 +39,4 @@ class Module
     }
 
 }
+

@@ -5,7 +5,7 @@
  * bareos-webui - Bareos Web-Frontend
  *
  * @link      https://github.com/bareos/bareos-webui for the canonical source repository
- * @copyright Copyright (c) 2013-2017 Bareos GmbH & Co. KG (http://www.bareos.org/)
+ * @copyright Copyright (c) 2013-2019 Bareos GmbH & Co. KG (http://www.bareos.org/)
  * @license   GNU Affero General Public License (http://www.gnu.org/licenses/)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,66 +23,91 @@
  *
  */
 
-namespace Api\Controller;
+namespace API\Controller;
 
 use Zend\Mvc\Controller\AbstractActionController;
 use Zend\Json\Json;
 use Zend\Http\Response;
 
-class ApiController extends AbstractActionController
+class APIController extends AbstractActionController
 {
 
     protected $apiModel = null;
     protected $bsock = null;
+
+    private $requestObject = null;
+    private $command = null;
+    private $resultObject = null;
 
     public function indexAction()
     {
         $this->RequestURIPlugin()->setRequestURI();
 
         if (!$this->SessionTimeoutPlugin()->isValid()) {
-            return $this->redirect()->toRoute(
-                'auth', array('action' => 'login'),
-                array('query' => array('req'  => $this->RequestURIPlugin()
-                    ->getRequestURI(),
-                                       'dird' => $_SESSION['bareos']['director']))
-            );
+          return $this->redirect()->toRoute(
+            'auth',
+            array(
+              'action' => 'login'
+            ),
+            array(
+              'query' => array(
+                'req'  => $this->RequestURIPlugin()->getRequestURI(),
+                'dird' => $_SESSION['bareos']['director']
+              )
+            )
+          );
         }
 
         $response = $this->getResponse();
-        $request = $this->getRequest();
 
-        if (!$request->isPost()) {
+        if (!$this->getRequest()->isPost()) {
             $response->setStatusCode(Response::STATUS_CODE_404);
         } else {
             $this->bsock = $this->getServiceLocator()->get('director');
-
-            $raw = $this->request->getContent();
-            $request = Json::decode($raw);
-
-            // und ab in die bconsole
-            $model = $this->getApiModel();
-            $cmdResult = $model->executeCommand($this->bsock, $request->cmd);
-
-            $request->result = $cmdResult;
-
-            $response = $this->getResponse();
+            $this->setRequestObject($this->getRequest()->getContent());
+            $this->setCommand();
+            $this->setResultObject();
             $response->getHeaders()->addHeaderLine(
                 'Content-Type', 'application/json'
             );
-
-            $response->setContent(Json::encode($request));
+            $response->setContent($this->resultObject);
         }
 
         return $response;
     }
 
-    public function getApiModel()
+    private function setRequestObject($requestObjectData)
+    {
+      $this->requestObject = Json::decode($requestObjectData);
+    }
+
+    private function setResultObject()
+    {
+      $model = $this->getAPIModel();
+      $this->resultObject = $model->executeCommand($this->bsock, $this->command);
+    }
+
+    private function setCommand()
+    {
+      $this->command .= $this->requestObject->method . ' ';
+
+      if(array_key_exists("subcommand", $this->requestObject->params)) {
+~       $this->command .= $this->requestObject->params->subcommand . ' ';
+      }
+
+      foreach($this->requestObject->params as $key => $value) {
+        $this->command .= $key . '="' . $value .'" ';
+      }
+    }
+
+    public function getAPIModel()
     {
         if (!$this->apiModel) {
             $sm = $this->getServiceLocator();
-            $this->apiModel = $sm->get('Api\Model\ApiModel');
+            $this->apiModel = $sm->get('API\Model\APIModel');
         }
         return $this->apiModel;
     }
 
 }
+

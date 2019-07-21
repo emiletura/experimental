@@ -39,7 +39,7 @@ $modules = array(
    'Job',
    'Restore',
    'Auth',
-   'Api'
+   'API'
 );
 
 

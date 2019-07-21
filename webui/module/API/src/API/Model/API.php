@@ -23,26 +23,8 @@
  *
  */
 
-namespace Api\Model;
-use Zend\Json\Json;
+namespace API\Model;
 
-class ApiModel
+class API
 {
-    /**
-     * @param $bsock
-     * @param $cmd
-     *
-     * @return result object from bsock response
-     */
-    public function executeCommand(&$bsock, $cmd)
-    {
-        $response = $bsock->send_command($cmd, 2, null);
-        $obj = Json::decode($response);
-        if (isset($obj->result)) {
-            return $obj->result;
-
-        } else {
-            return $obj;
-        }
-    }
 }
