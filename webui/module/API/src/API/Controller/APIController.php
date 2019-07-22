@@ -31,7 +31,6 @@ use Zend\Http\Response;
 
 class APIController extends AbstractActionController
 {
-
     protected $apiModel = null;
     protected $bsock = null;
 
@@ -44,12 +43,12 @@ class APIController extends AbstractActionController
         $this->RequestURIPlugin()->setRequestURI();
 
         if (!$this->SessionTimeoutPlugin()->isValid()) {
-          return $this->redirect()->toRoute(
-            'auth',
-            array(
+            return $this->redirect()->toRoute(
+              'auth',
+              array(
               'action' => 'login'
             ),
-            array(
+              array(
               'query' => array(
                 'req'  => $this->RequestURIPlugin()->getRequestURI(),
                 'dird' => $_SESSION['bareos']['director']
@@ -68,7 +67,8 @@ class APIController extends AbstractActionController
             $this->setCommand();
             $this->setResultObject();
             $response->getHeaders()->addHeaderLine(
-                'Content-Type', 'application/json'
+                'Content-Type',
+                'application/json'
             );
             $response->setContent($this->resultObject);
         }
@@ -78,26 +78,26 @@ class APIController extends AbstractActionController
 
     private function setRequestObject($requestObjectData)
     {
-      $this->requestObject = Json::decode($requestObjectData);
+        $this->requestObject = Json::decode($requestObjectData);
     }
 
     private function setResultObject()
     {
-      $model = $this->getAPIModel();
-      $this->resultObject = $model->executeCommand($this->bsock, $this->command);
+        $model = $this->getAPIModel();
+        $this->resultObject = $model->executeCommand($this->bsock, $this->command);
     }
 
     private function setCommand()
     {
-      $this->command .= $this->requestObject->method . ' ';
+        $this->command .= $this->requestObject->method . ' ';
 
-      if(array_key_exists("subcommand", $this->requestObject->params)) {
-~       $this->command .= $this->requestObject->params->subcommand . ' ';
-      }
+        if (array_key_exists("subcommand", $this->requestObject->params)) {
+            $this->command .= $this->requestObject->params->subcommand . ' ';
+        }
 
-      foreach($this->requestObject->params as $key => $value) {
-        $this->command .= $key . '="' . $value .'" ';
-      }
+        foreach ($this->requestObject->params as $key => $value) {
+            $this->command .= $key . '="' . $value .'" ';
+        }
     }
 
     public function getAPIModel()
@@ -108,6 +108,4 @@ class APIController extends AbstractActionController
         }
         return $this->apiModel;
     }
-
 }
-

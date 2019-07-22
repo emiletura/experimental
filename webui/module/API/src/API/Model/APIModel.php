@@ -24,6 +24,7 @@
  */
 
 namespace API\Model;
+
 use Zend\Json\Json;
 
 class APIModel
@@ -35,10 +36,9 @@ class APIModel
    *
    * @return result object from bsock response
    */
-  public function executeCommand(&$bsock, $command)
-  {
-    $response = $bsock->send_command($command, 2, null);
-    return $response;
-  }
-
+    public function executeCommand(&$bsock, $command)
+    {
+        $response = $bsock->send_command($command, 2, null);
+        return $response;
+    }
 }

@@ -6,7 +6,6 @@ use API\Model\APIModel;
 
 class Module
 {
-
     public function getAutoloaderConfig()
     {
         return array(
@@ -37,6 +36,4 @@ class Module
             )
         );
     }
-
 }
-
