@@ -7,10 +7,9 @@ use Pool\Model\PoolModel;
 
 class Module
 {
-
-   public function getAutoloaderConfig()
-   {
-      return array(
+    public function getAutoloaderConfig()
+    {
+        return array(
          'Zend\Loader\ClassMapAutoloader' => array(
             __DIR__ . '/autoload_classmap.php',
          ),
@@ -20,24 +19,22 @@ class Module
             ),
          ),
       );
-   }
+    }
 
-   public function getConfig()
-   {
-      return include  __DIR__ . '/config/module.config.php';
-   }
+    public function getConfig()
+    {
+        return include  __DIR__ . '/config/module.config.php';
+    }
 
-   public function getServiceConfig()
-   {
-      return array(
+    public function getServiceConfig()
+    {
+        return array(
          'factories' => array(
-            'Pool\Model\PoolModel' => function() {
-               $model = new PoolModel();
-               return $model;
+            'Pool\Model\PoolModel' => function () {
+                $model = new PoolModel();
+                return $model;
             }
          )
       );
-   }
-
+    }
 }
-
