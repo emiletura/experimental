@@ -31,81 +31,166 @@ use Zend\Http\Response;
 
 class APIController extends AbstractActionController
 {
-    protected $apiModel = null;
-    protected $bsock = null;
+  protected $apiModel = null;
+  protected $bsock = null;
 
-    private $requestObject = null;
-    private $command = null;
-    private $resultObject = null;
+  private $requestObject = null;
+  private $resultObject = null;
 
-    public function indexAction()
-    {
-        $this->RequestURIPlugin()->setRequestURI();
+  public function indexAction()
+  {
+    $this->RequestURIPlugin()->setRequestURI();
 
-        if (!$this->SessionTimeoutPlugin()->isValid()) {
-            return $this->redirect()->toRoute(
-              'auth',
-              array(
-              'action' => 'login'
-            ),
-              array(
-              'query' => array(
-                'req'  => $this->RequestURIPlugin()->getRequestURI(),
-                'dird' => $_SESSION['bareos']['director']
-              )
-            )
-          );
-        }
+    if ( ! $this->SessionTimeoutPlugin()->isValid()) {
+      return $this->redirect()->toRoute(
+        'auth',
+        array(
+          'action' => 'login',
+        ),
+        array(
+          'query' => array(
+            'req'  => $this->RequestURIPlugin()->getRequestURI(),
+            'dird' => $_SESSION['bareos']['director'],
+          ),
+        )
+      );
+    }
 
-        $response = $this->getResponse();
+    $response = $this->getResponse();
 
-        if (!$this->getRequest()->isPost()) {
-            $response->setStatusCode(Response::STATUS_CODE_404);
+    if ( ! $this->getRequest()->isPost()) {
+      $response->setStatusCode(Response::STATUS_CODE_404);
+    } else {
+      $this->bsock         = $this->getServiceLocator()->get('director');
+      $this->requestObject = $this->decodeRequestObject($this->getRequest()->getContent());
+
+      $commandObjects = $this->generateListJobsJobstatusCommandObjects($this->requestObject);
+
+      $responseObjects = array();
+      foreach ($commandObjects as $commandObject) {
+        $command = $this->parseRequestObject($commandObject);
+        array_push($responseObjects, JSON::decode($this->executeCommand($command)));
+      }
+
+      $mergedResults = array();
+      foreach ($responseObjects as $responseObject) {
+        array_push($mergedResults, $responseObject->result);
+      }
+
+      $response->getHeaders()->addHeaderLine(
+        'Content-Type',
+        'application/json'
+      );
+      $response->setContent($this->resultObject);
+    }
+
+    return $response;
+  }
+
+  private function decodeRequestObject($requestObjectData)
+  {
+    return Json::decode($requestObjectData);
+  }
+
+  private function executeCommand($command)
+  {
+    $model = $this->getAPIModel();
+
+    return $model->executeCommand($this->bsock, $command);
+  }
+
+  private function parseRequestObject($commandObject)
+  {
+    $command = $commandObject->method.' ';
+
+    if (isset($this->requestObject->params->subcommand)) {
+      $command .= $commandObject->params->subcommand.' ';
+    }
+
+
+    foreach ($commandObject->params as $key => $value) {
+      if ($key !== "subcommand") {
+        $command .= $key.'="'.$value.'" ';
+      }
+    }
+
+    return $command;
+  }
+
+  public function getAPIModel()
+  {
+    if ( ! $this->apiModel) {
+      $sm             = $this->getServiceLocator();
+      $this->apiModel = $sm->get('API\Model\APIModel');
+    }
+
+    return $this->apiModel;
+  }
+
+  public function getJobsByStatus(&$bsock = null, $jobname = null, $status = null, $days = null, $hours = null)
+  {
+    if (isset($bsock, $status)) {
+      if (isset($days)) {
+        if ($days == "all") {
+          $cmd = 'llist jobs jobstatus='.$status.'';
         } else {
-            $this->bsock = $this->getServiceLocator()->get('director');
-            $this->setRequestObject($this->getRequest()->getContent());
-            $this->setCommand();
-            $this->setResultObject();
-            $response->getHeaders()->addHeaderLine(
-                'Content-Type',
-                'application/json'
-            );
-            $response->setContent($this->resultObject);
+          $cmd = 'llist jobs jobstatus='.$status.' days='.$days.'';
         }
-
-        return $response;
-    }
-
-    private function setRequestObject($requestObjectData)
-    {
-        $this->requestObject = Json::decode($requestObjectData);
-    }
-
-    private function setResultObject()
-    {
-        $model = $this->getAPIModel();
-        $this->resultObject = $model->executeCommand($this->bsock, $this->command);
-    }
-
-    private function setCommand()
-    {
-        $this->command .= $this->requestObject->method . ' ';
-
-        if (array_key_exists("subcommand", $this->requestObject->params)) {
-            $this->command .= $this->requestObject->params->subcommand . ' ';
+      } elseif (isset($hours)) {
+        if ($hours == "all") {
+          $cmd = 'llist jobs jobstatus='.$status.'';
+        } else {
+          $cmd = 'llist jobs jobstatus='.$status.' hours='.$hours.'';
         }
+      } else {
+        $cmd = 'llist jobs jobstatus='.$status.'';
+      }
+      if ($jobname != "all") {
+        $cmd .= ' jobname="'.$jobname.'"';
+      }
+      $limit  = 1000;
+      $offset = 0;
+      $retval = array();
+      while (true) {
+        $result = $bsock->send_command($cmd.' limit='.$limit.' offset='.$offset, 2, null);
+        if (preg_match('/Failed to send result as json. Maybe result message to long?/', $result)) {
+          $error = \Zend\Json\Json::decode($result, \Zend\Json\Json::TYPE_ARRAY);
 
-        foreach ($this->requestObject->params as $key => $value) {
-            $this->command .= $key . '="' . $value .'" ';
+          return $error['result']['error'];
+        } else {
+          $jobs = \Zend\Json\Json::decode($result, \Zend\Json\Json::TYPE_ARRAY);
+          if (empty($result)) {
+            return false;
+          }
+          if (empty($jobs['result']['jobs']) && $jobs['result']['meta']['range']['filtered'] === 0) {
+            return array_reverse($retval);
+          } else {
+            $retval = array_merge($retval, $jobs['result']['jobs']);
+          }
         }
+        $offset = $offset + $limit;
+      }
+    } else {
+      throw new \Exception('Missing argument.');
+    }
+  }
+
+  private function generateListJobsJobstatusCommandObjects($requestObject)
+  {
+    $requestObjects = array();
+    if (($requestObject->method == "list" || $requestObject->method == "llist")
+      && $requestObject->params->subcommand == "jobs"
+      && isset($requestObject->params->jobstatus)
+    ) {
+
+      foreach (str_split($requestObject->params->jobstatus) as $jobstatus) {
+        $object                           = unserialize(serialize($requestObject));
+        $object->params->jobstatus = $jobstatus;
+        array_push($requestObjects, $object);
+      }
     }
 
-    public function getAPIModel()
-    {
-        if (!$this->apiModel) {
-            $sm = $this->getServiceLocator();
-            $this->apiModel = $sm->get('API\Model\APIModel');
-        }
-        return $this->apiModel;
-    }
+    return $requestObjects;
+  }
+
 }
